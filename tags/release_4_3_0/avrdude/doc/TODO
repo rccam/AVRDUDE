@@ -1,0 +1,22 @@
+
+- Man page needs updated for avr910 info.
+
+- Website needs to link to docs:
+  http://savannah.nongnu.org/download/avrdude/doc/avrdude-html/
+
+- [Windows Port] Use Windows API for serial port communications (ser_win32.c).
+  (In Progress)
+  
+- Add "skip empty pages" optimization on avr910 paged write. The stk500 has
+  this optimization already.
+
+- Fix "overfull \hbox" issues in building documentation.
+
+- FIXME: term.c: terminal_get_input(): strip newlines in non-readline input 
+  code.
+
+- FIXME: avr910.c: avr910_cmd(): Insert version check here.
+
+- FIXME: ser_posix.c: serial_close(): Should really restore the terminal to 
+  original state here.
+
