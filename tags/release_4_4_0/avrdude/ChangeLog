@@ -1,0 +1,210 @@
+2004-07-18  Theodore A. Roth  <troth@openavr.org>
+
+	* AVRDUDE 4.4.0 has been released (cvs release tag is "release_4_4_0").
+
+2004-07-18  Theodore A. Roth  <troth@openavr.org>
+
+	* Makefile.am (EXTRA_DIST): Remove avrdude.pdf since it is no longer
+	supplied.
+	* NEWS: Fix typo.
+	* bootstrap: Delete the autom4te.cache dir before running the
+	autotools.
+	* configure.ac (AC_INIT): Set version to 4.4.0.
+
+2004-07-17  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avrdude.1: Fixed obvious copy and paste error
+	(Patch #3199 contributed by Galen Seitz)
+
+2004-07-15  Theodore A. Roth  <troth@openavr.org>
+
+	* main.c (main): Don't indent CPP directives.
+	When showing update progress in a no tty situation, use unbuffered IO
+	for all systems, not just win32 native.
+	Update copyright year when printing version.
+	Remove warning about native win32 being experimental.
+	Split a line string.
+	* ppiwin.c: Update copyright year.
+	Add cvs Id keyword.
+	(usleep): Cleanup debug CPP directives to improve readability.
+	* ser_win32.c: Include <stdio.h> to fix failing build.
+
+2004-07-08  Theodore A. Roth  <troth@openavr.org>
+
+	* AUTHORS: Add names of recent major contributors.
+	* ser_win32.c: Assign copyright to Martin J. Thomas since he did all
+	real work on this file.
+
+2004-07-07  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* NEWS, doc/TODO: Updated NEWS and TODO
+
+2004-07-07  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* stk500.c, term.c, doc/avrdude.texi, avrdude.1:
+	added "sck"-command to the terminal mode.
+	This command allows slowing down of the SCK of
+	STK500-programmers.
+
+2004-07-05  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* *.c, *.h: Removed unnecessary includes of
+	config.h
+
+2004-07-04  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avr.h: Removed some unused prototypes
+
+2004-07-04  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* stk500.c: Fixed fosc behaviour for values exceeding
+	maximum frequency (contributed by Galen Seitz)
+
+2004-07-04  Jan-Hinnerk Reichert  <hinni@despammed.com>
+	* avrdude.conf.in: Added support for
+	ATtiny2313 (contributed by Bob Paddock)
+
+2004-06-25  Joerg Wunsch <j@uriah.heep.sax.de>
+
+	* avrdude.conf.in: Fix efuse bits for ATmega169.
+
+2004-06-24  Alex Shepherd <maillists@ajsystems.co.nz>
+
+	Merged in Win32 Native changes contributed by Martin Thomas
+	Changed all instances of __CYGWIN__ conditional compilation to
+	WIN32NATIVE
+
+	* ser_win32.c: fleshed out all the previous stubs
+	* ser_posix.c: added WIN32NATIVE conditional compilation to skip
+	all function to allow ser_win32.c functions to operate
+	* ppi.h: removed commented code
+	* pgh.h: added usleep macros
+	* main.c: stdout,stderr tweaks for Win32
+	* configure.ac: added CFLAGS and LDFLAGS for Win32Native
+	* config_gram.y: added strtok_r macro
+	* buterfly.c: added various stub functions and EXIT processing
+	* avr910.c: added return 0 to avr910_open() and included time headers
+	* term.c: added warning about libreadline not supported in WIN32NATIVE
+
+2004-06-17  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avrdude.conf.in: Added support for
+	  - tiny13 (contributed by Pawel Moll)
+	  - mega48 and mega88 (contributed by Galen Seitz)
+	However, the STK500-code for mega8 remains unchanged.
+
+2004-05-19  Brian S. Dean  <bsd@bsdhome.com>
+
+	* main.c:
+	* stk500.c: Allow the baud rate to be specified on the command
+	line with a new -b switch.  The specified baud rate will
+	override the default serial port baud rate for a particular
+	programmer.
+
+2004-05-19  Brian S. Dean  <bsd@bsdhome.com>
+
+	* ppi.c: Stub-out the ppi_* functions in ppi.c with empty
+	wrappers that simply return an error code in order to build
+	successfully on MacOS X.  This allows avrdude to work on MacOS
+	X and was tested using a USB<->RS232 cable adapter,
+	specifically Keyspan model USA-19HS.
+
+2004-04-23  Joerg Wunsch <j@uriah.heep.sax.de>
+
+	* lists.h, lists.c: Drop LISTSZ and the check for
+	it in lcreat().
+
+2004-04-17  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avr910.c: Hopefully fixed that weird "first byte not
+	programmed"-error in a good way (previous fix was not
+	working with all firmwares)
+
+2004-02-10  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avrdude.1, doc/avrdude.texi, doc/TODO:
+	Removed the deprecated options from documentation
+
+2004-02-10  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* main.c: Removed deprecated options.
+
+2004-01-28  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* pgm.c, main.c, avr910.c, butterfly.c, stk500.c:
+	Changed default for powerup, powerdown and LED-commands
+	to do nothing and return OK. Then removed these commands
+	from avr910, butterfly and stk500.
+	* pgm.c: Fixed wrong type for default_open introduced by
+	the cleanup yesterday.
+
+2004-01-29  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* par.c: changed order of port-read/writes in par_txrx().
+	This change should increase immunity to delays in the
+	programmer-hardware.
+	Also did some unrelated cleanup in par_txrx().
+
+2004-01-28  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* pgm.[ch], main.c, par.c, avr910.c, butterfly.c, stk500.c:
+	Move save/restore-functionality into open/close.
+	* par.c: open/close now saves/restores PPICTRL, too.
+	* TODO: exitspecs don't work if RESET is in PPICTRL.
+
+2004-01-26  Theodore A. Roth  <troth@openavr.org>
+
+	* configure.ac (AC_INIT): Post release version update.
+
+2004-01-26  Theodore A. Roth  <troth@openavr.org>
+
+	* AVRDUDE 4.3.0 has been released (cvs release tag is "release_4_3_0").
+
+2004-01-26  Theodore A. Roth  <troth@openavr.org>
+
+	* configure.ac: Update copyright year.
+	(AC_INIT): Set version to 4.3.0.
+
+2004-01-25  Theodore A. Roth  <troth@openavr.org>
+
+	* ChangeLog: Minor formatting cleanups.
+	Move to all 2003 entries to ChangeLog-2003.
+	* ChangeLog-2003: New file.
+	* Makefile.am: Update copyright year.
+	(EXTRA_DIST): Add ChangeLog-2003.
+
+2004-01-17  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* doc/avrdude.texi: Get rid of those black boxes marking "overfull
+	hbox".
+
+2004-01-17  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* doc/avrdude.texi: New appendix "Troubleshooting".
+
+2004-01-12  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avr910.c, avrpart.c, avrpart.h, doc/TODO:
+	Look up devicecode and report device.
+
+2004-01-03  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avr910.c, pgm.c, pgm.h, config_gram.y, lexer.l: Add new configuration
+	parameter baudrate to support avr910-programmers with non-standard
+	baudrates.
+	* avrdude.conf.in, doc/avrdude.texi: Added "baudrate" to documentation.
+
+2004-01-03  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* avr910.c: Removed debugging stuff that is no longer needed.
+
+2004-01-03  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* doc/TODO: Removed two items.
+
+2004-01-03  Jan-Hinnerk Reichert  <hinni@despammed.com>
+
+	* main.c, avr.c, avr.h, par.c, stk500.c: Add function
+	avr_chip_erase() to unify handling of cycle-count.
+	Makes cycle-count work for avr910-programmers.
+
