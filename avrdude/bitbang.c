@@ -606,7 +606,7 @@ int bitbang_initialize(PROGRAMMER * pgm, AVRPART * p)
    * order to possibly get back into sync with the chip if we are out
    * of sync.
    */
-  if (p->flags & AVRPART_IS_AT90S1200) {
+  if (strcmp(p->desc, "AT90S1200")==0) {
     pgm->program_enable(pgm, p);
   }
   else {
