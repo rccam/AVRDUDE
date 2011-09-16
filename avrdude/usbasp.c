@@ -145,24 +145,16 @@ static int usbasp_initialize(PROGRAMMER * pgm, AVRPART * p);
 static int usbasp_spi_cmd(PROGRAMMER * pgm, unsigned char cmd[4], unsigned char res[4]);
 static int usbasp_spi_program_enable(PROGRAMMER * pgm, AVRPART * p);
 static int usbasp_spi_chip_erase(PROGRAMMER * pgm, AVRPART * p);
-static int usbasp_spi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int addr, unsigned int n_bytes);
-static int usbasp_spi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int addr, unsigned int n_bytes);
+static int usbasp_spi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, int page_size, int n_bytes);
+static int usbasp_spi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, int page_size, int n_bytes);
 static int usbasp_spi_set_sck_period(PROGRAMMER *pgm, double sckperiod);
 // TPI specific functions
 static void usbasp_tpi_send_byte(PROGRAMMER * pgm, uint8_t b);
 static int usbasp_tpi_cmd(PROGRAMMER * pgm, unsigned char cmd[4], unsigned char res[4]);
 static int usbasp_tpi_program_enable(PROGRAMMER * pgm, AVRPART * p);
 static int usbasp_tpi_chip_erase(PROGRAMMER * pgm, AVRPART * p);
-static int usbasp_tpi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int addr, unsigned int n_bytes);
-static int usbasp_tpi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int addr, unsigned int n_bytes);
+static int usbasp_tpi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, int page_size, int n_bytes);
+static int usbasp_tpi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, int page_size, int n_bytes);
 static int usbasp_tpi_set_sck_period(PROGRAMMER *pgm, double sckperiod);
 static int usbasp_tpi_read_byte(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, unsigned long addr, unsigned char * value);
 static int usbasp_tpi_write_byte(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, unsigned long addr, unsigned char data);
@@ -605,11 +597,11 @@ static int usbasp_spi_chip_erase(PROGRAMMER * pgm, AVRPART * p)
 }
 
 static int usbasp_spi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int address, unsigned int n_bytes)
+                             int page_size, int n_bytes)
 {
   int n;
   unsigned char cmd[4];
+  int address = 0;
   int wbytes = n_bytes;
   int blocksize;
   unsigned char * buffer = m->buf;
@@ -663,17 +655,19 @@ static int usbasp_spi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 
     buffer += blocksize;
     address += blocksize;
+
+    report_progress (address, n_bytes, NULL);
   }
 
   return n_bytes;
 }
 
 static int usbasp_spi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int address, unsigned int n_bytes)
+                              int page_size, int n_bytes)
 {
   int n;
   unsigned char cmd[4];
+  int address = 0;
   int wbytes = n_bytes;
   int blocksize;
   unsigned char * buffer = m->buf;
@@ -734,6 +728,8 @@ static int usbasp_spi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 
     buffer += blocksize;
     address += blocksize;
+
+    report_progress (address, n_bytes, NULL);
   }
 
   return n_bytes;
@@ -930,9 +926,7 @@ static int usbasp_tpi_chip_erase(PROGRAMMER * pgm, AVRPART * p)
   return 0;
 }
 
-static int usbasp_tpi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int addr, unsigned int n_bytes)
+static int usbasp_tpi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, int page_size, int n_bytes)
 {
   unsigned char cmd[4];
   unsigned char* dptr;
@@ -941,7 +935,7 @@ static int usbasp_tpi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 
 
   dptr = m->buf;
-  pr = addr + m->offset;
+  pr = m->offset;
   readed = 0;
 
   while(readed < n_bytes)
@@ -965,14 +959,14 @@ static int usbasp_tpi_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     readed += clen;
     pr += clen;
     dptr += clen;
+
+    report_progress(readed, n_bytes, NULL);
   }
 
   return n_bytes;
 }
 
-static int usbasp_tpi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int addr, unsigned int n_bytes)
+static int usbasp_tpi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, int page_size, int n_bytes)
 {
   unsigned char cmd[4];
   unsigned char dummy[8];
@@ -982,7 +976,7 @@ static int usbasp_tpi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 
 
   sptr = m->buf;
-  pr = addr + m->offset;
+  pr = m->offset;
   writed = 0;
 
   /* Set PR to flash */
@@ -1021,6 +1015,8 @@ static int usbasp_tpi_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     writed += clen;
     pr += clen;
     sptr += clen;
+
+    report_progress(writed, n_bytes, NULL);
   }
   
   /* finishing write */

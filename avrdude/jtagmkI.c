@@ -737,11 +737,9 @@ static void jtagmkI_close(PROGRAMMER * pgm)
 
 
 static int jtagmkI_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                               unsigned int page_size,
-                               unsigned int addr, unsigned int n_bytes)
+				int page_size, int n_bytes)
 {
-  int block_size, send_size, tries;
-  unsigned int maxaddr = addr + n_bytes;
+  int addr, block_size, send_size, tries;
   unsigned char cmd[6], *datacmd;
   unsigned char resp[2];
   int is_flash = 0;
@@ -783,7 +781,9 @@ static int jtagmkI_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   datacmd[0] = CMD_DATA;
 
   serial_recv_timeout = 1000;
-  for (; addr < maxaddr; addr += page_size) {
+  for (addr = 0; addr < n_bytes; addr += page_size) {
+    report_progress(addr, n_bytes,NULL);
+
     tries = 0;
     again:
 
@@ -875,11 +875,9 @@ static int jtagmkI_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 }
 
 static int jtagmkI_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-			      unsigned int page_size,
-                              unsigned int addr, unsigned int n_bytes)
+			       int page_size, int n_bytes)
 {
-  int block_size, read_size, is_flash = 0, tries;
-  unsigned int maxaddr = addr + n_bytes;
+  int addr, block_size, read_size, is_flash = 0, tries;
   unsigned char cmd[6], resp[256 * 2 + 3];
   long otimeout = serial_recv_timeout;
 #define MAXTRIES 3
@@ -908,7 +906,9 @@ static int jtagmkI_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   }
 
   serial_recv_timeout = 1000;
-  for (; addr < maxaddr; addr += page_size) {
+  for (addr = 0; addr < n_bytes; addr += page_size) {
+    report_progress(addr, n_bytes,NULL);
+
     tries = 0;
     again:
     if (tries != 0 && jtagmkI_resync(pgm, 2000, 0) < 0) {

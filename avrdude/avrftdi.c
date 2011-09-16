@@ -145,8 +145,7 @@ static int add_pin(PROGRAMMER *pgm, int pinfunc)
 	else if(TYPE_2232H == ftype)
 		mlim=15;
 	else{
-		fprintf(stderr, "Unknown type %d (0x%x)\n",
-			ftype, ftype);
+		printf("Unknown type %d (0x%x)\n",ftype,ftype);
 		mlim=15;
 	}
 	/* check that the pin number is in range */
@@ -206,8 +205,8 @@ static int add_pins(PROGRAMMER *pgm, int pinfunc)
 	else if (TYPE_2232H == ftype)
 		mlim = 16;
 	else{
-		fprintf(stderr, "Unknown type %d (0x%x)\n",
-			ftype, ftype);
+		printf("Unknown type %d (0x%x)\n",
+		       ftype, ftype);
 		mlim = 16;
 	}
 	if (mask >= 1 << mlim) {
@@ -263,7 +262,7 @@ static int write_flush(void)
 #endif
 
 	if (verbose > 3)
-		fprintf(stderr, "FTDI LOG: %02x %02x %02x %02x %02x %02x\n",
+		printf("FTDI LOG: %02x %02x %02x %02x %02x %02x\n",
 		       buf[0], buf[1], buf[2], buf[3], buf[4], buf[5]);
 
 	/* we need to flush here, because set_pin is used as reset.
@@ -741,6 +740,8 @@ static int avrftdi_eeprom_write(PROGRAMMER *pgm, AVRPART *p, AVRMEM *m,
 		E(avrftdi_transmit(TX, cmd, cmd, 4) < 0);
 
 		usleep((m->max_write_delay));
+		if(verbose < 3)
+			report_progress(add, len, NULL);
 	}
 	return len;
 }
@@ -763,6 +764,8 @@ static int avrftdi_eeprom_read(PROGRAMMER *pgm, AVRPART *p, AVRMEM *m,
 		E(avrftdi_transmit(TRX, cmd, cmd, 4) < 0);
 
 		avr_get_output(m->op[AVR_OP_READ], cmd, bufptr++);
+		if(verbose < 3)
+			report_progress(add, len, NULL);
 	}
 
 	memcpy(m->buf, buffer, len);
@@ -970,6 +973,8 @@ static int avrftdi_flash_read(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 				o_ptr = o_buf;
 			}
 		}
+		if (verbose < 3)
+			report_progress(2 * address, len, NULL);
 	}
 	memcpy(m->buf, buffer, sizeof(buffer));
 

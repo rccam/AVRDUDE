@@ -136,8 +136,7 @@ static int jtagmkII_setparm(PROGRAMMER * pgm, unsigned char parm,
                             unsigned char * value);
 static void jtagmkII_print_parms1(PROGRAMMER * pgm, const char * p);
 static int jtagmkII_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                unsigned int page_size,
-                                unsigned int addr, unsigned int n_bytes);
+                                int page_size, int n_bytes);
 
 // AVR32
 #define ERROR_SAB 0xFFFFFFFF
@@ -155,16 +154,14 @@ static int jtagmkII_avr32_reset(PROGRAMMER * pgm, unsigned char val,
                                   unsigned char ret1, unsigned char ret2);
 static int jtagmkII_smc_init32(PROGRAMMER * pgm);
 static int jtagmkII_paged_write32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int addr, unsigned int n_bytes);
+                                  int page_size, int n_bytes);
 static int jtagmkII_flash_lock32(PROGRAMMER * pgm, unsigned char lock,
                                   unsigned int page);
 static int jtagmkII_flash_erase32(PROGRAMMER * pgm, unsigned int page);
 static int jtagmkII_flash_write_page32(PROGRAMMER * pgm, unsigned int page);
 static int jtagmkII_flash_clear_pagebuffer32(PROGRAMMER * pgm);
 static int jtagmkII_paged_load32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int addr, unsigned int n_bytes);
+			       int page_size, int n_bytes);
 
 void jtagmkII_setup(PROGRAMMER * pgm)
 {
@@ -1753,11 +1750,9 @@ void jtagmkII_close(PROGRAMMER * pgm)
 }
 
 static int jtagmkII_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                unsigned int page_size,
-                                unsigned int addr, unsigned int n_bytes)
+				int page_size, int n_bytes)
 {
-  unsigned int block_size;
-  unsigned int maxaddr = addr + n_bytes;
+  int addr, block_size;
   unsigned char *cmd;
   unsigned char *resp;
   unsigned char par[4];
@@ -1797,8 +1792,9 @@ static int jtagmkII_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
        * jtagmkII_paged_write() to EEPROM attempted while in
        * DW mode.  Use jtagmkII_write_byte() instead.
        */
-      for (; addr < maxaddr; addr++) {
+      for (addr = 0; addr < n_bytes; addr++) {
 	status = jtagmkII_write_byte(pgm, p, m, addr, m->buf[addr]);
+	report_progress(addr, n_bytes, NULL);
 	if (status < 0) {
 	  free(cmd);
 	  return -1;
@@ -1812,9 +1808,11 @@ static int jtagmkII_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     page_size = PDATA(pgm)->eeprom_pagesize;
   }
   serial_recv_timeout = 100;
-  for (; addr < maxaddr; addr += page_size) {
-    if ((maxaddr - addr) < page_size)
-      block_size = maxaddr - addr;
+  for (addr = 0; addr < n_bytes; addr += page_size) {
+    report_progress(addr, n_bytes,NULL);
+
+    if ((n_bytes-addr) < page_size)
+      block_size = n_bytes - addr;
     else
       block_size = page_size;
     if (verbose >= 3)
@@ -1890,11 +1888,9 @@ static int jtagmkII_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 }
 
 static int jtagmkII_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                               unsigned int page_size,
-                               unsigned int addr, unsigned int n_bytes)
+			       int page_size, int n_bytes)
 {
-  unsigned int block_size;
-  unsigned int maxaddr = addr + n_bytes;
+  int addr, block_size;
   unsigned char cmd[10];
   unsigned char *resp;
   int status, tries;
@@ -1921,9 +1917,11 @@ static int jtagmkII_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     cmd[1] = MTYPE_USERSIG;
   }
   serial_recv_timeout = 100;
-  for (; addr < maxaddr; addr += page_size) {
-    if ((maxaddr - addr) < page_size)
-      block_size = maxaddr - addr;
+  for (addr = 0; addr < n_bytes; addr += page_size) {
+    report_progress(addr, n_bytes,NULL);
+
+    if ((n_bytes-addr) < page_size)
+      block_size = n_bytes - addr;
     else
       block_size = page_size;
     if (verbose >= 3)
@@ -3235,11 +3233,9 @@ static void jtagmkII_close32(PROGRAMMER * pgm)
 }
 
 static int jtagmkII_paged_load32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int addr, unsigned int n_bytes)
+			       int page_size, int n_bytes)
 {
-  unsigned int block_size;
-  unsigned int maxaddr = addr + n_bytes;
+  unsigned int addr, block_size;
   unsigned char cmd[7];
   unsigned char *resp;
   int lineno, status;
@@ -3278,8 +3274,11 @@ static int jtagmkII_paged_load32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   cmd[1] = 0x40;
   cmd[2] = 0x05;
 
-  for (; addr < maxaddr; addr += block_size) {
-    block_size = ((maxaddr-addr) < pgm->page_size) ? (maxaddr - addr) : pgm->page_size;
+  addr = 0;
+  for (addr = 0; addr < n_bytes; addr += block_size) {
+    report_progress(addr, n_bytes, NULL);
+
+    block_size = ((n_bytes-addr) < pgm->page_size) ? (n_bytes - addr) : pgm->page_size;
     if (verbose >= 3)
       fprintf(stderr, "%s: jtagmkII_paged_load32(): "
               "block_size at addr %d is %d\n",
@@ -3327,16 +3326,14 @@ static int jtagmkII_paged_load32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 }
 
 static int jtagmkII_paged_write32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int addr, unsigned int n_bytes)
+				int page_size, int n_bytes)
 {
-  unsigned int block_size;
+  unsigned int addr, block_size;
   unsigned char *cmd=NULL;
   unsigned char *resp;
-  int lineno, status, pages, sPageNum, pageNum, blocks;
+  int lineno, status, pages, pageNum, blocks;
   unsigned long val=0;
   unsigned long otimeout = serial_recv_timeout;
-  unsigned int maxaddr = addr + n_bytes;
 
   serial_recv_timeout = 256;
 
@@ -3346,8 +3343,7 @@ static int jtagmkII_paged_write32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   if(status != 0) {lineno = __LINE__; goto eRR;}
   p->flags |= AVRPART_WRITE;
 
-  pages = (n_bytes - addr - 1)/page_size + 1;
-  sPageNum = addr/page_size;
+  pages = (n_bytes-1)/page_size + 1;
   //fprintf(stderr, "\n pageSize=%d bytes=%d pages=%d m->offset=0x%x pgm->page_size %d\n",
   //        page_size, n_bytes, pages, m->offset, pgm->page_size);
 
@@ -3365,13 +3361,13 @@ static int jtagmkII_paged_write32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   }
 
   // First unlock the pages
-  for(pageNum=sPageNum; pageNum < pages; ++pageNum) {
+  for(pageNum=0; pageNum < pages; ++pageNum) {
     status =jtagmkII_flash_lock32(pgm, 0, pageNum);
     if(status < 0) {lineno = __LINE__; goto eRR;}
   }
 
   // Then erase them (guess could do this in the same loop above?)
-  for(pageNum=sPageNum; pageNum < pages; ++pageNum) {
+  for(pageNum=0; pageNum < pages; ++pageNum) {
     status =jtagmkII_flash_erase32(pgm, pageNum);
     if(status < 0) {lineno = __LINE__; goto eRR;}
   }
@@ -3380,13 +3376,16 @@ static int jtagmkII_paged_write32(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   u32_to_b4r(&cmd[1], 0x40000000);  // who knows
   cmd[5] = 0x5;
 
-  for(pageNum=sPageNum; pageNum < pages; ++pageNum) {
+  addr = 0;
+  for(pageNum=0; pageNum < pages; ++pageNum) {
+
+    report_progress(addr, n_bytes, NULL);
 
     status = jtagmkII_flash_clear_pagebuffer32(pgm);
     if(status != 0) {lineno = __LINE__; goto eRR;}
 
     for(blocks=0; blocks<2; ++blocks) {
-      block_size = ((maxaddr-addr) < pgm->page_size) ? (maxaddr - addr) : pgm->page_size;
+      block_size = ((n_bytes-addr) < pgm->page_size) ? (n_bytes - addr) : pgm->page_size;
       if (verbose >= 3)
         fprintf(stderr, "%s: jtagmkII_paged_write32(): "
                 "block_size at addr %d is %d\n",

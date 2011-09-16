@@ -267,6 +267,8 @@ static int stk500v2_getparm2(PROGRAMMER * pgm, unsigned char parm, unsigned int 
 static int stk500v2_setparm2(PROGRAMMER * pgm, unsigned char parm, unsigned int value);
 static int stk500v2_setparm_real(PROGRAMMER * pgm, unsigned char parm, unsigned char value);
 static void stk500v2_print_parms1(PROGRAMMER * pgm, const char * p);
+static int stk500v2_is_page_empty(unsigned int address, int page_size,
+                                  const unsigned char *buf);
 
 static unsigned int stk500v2_mode_for_pagesize(unsigned int pagesize);
 
@@ -1714,20 +1716,17 @@ static int stk500hvsp_write_byte(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
 }
 
 
-static int stk500v2_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                unsigned int page_size,
-                                unsigned int addr, unsigned int n_bytes)
+static int stk500v2_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m, 
+                              int page_size, int n_bytes)
 {
-  unsigned int block_size, last_addr, hiaddr, addrshift, use_ext_addr;
-  unsigned int maxaddr = addr + n_bytes;
+  unsigned int addr, block_size, last_addr, hiaddr, addrshift, use_ext_addr;
   unsigned char commandbuf[10];
   unsigned char buf[266];
   unsigned char cmds[4];
   int result;
   OPCODE * rop, * wop;
 
-  DEBUG("STK500V2: stk500v2_paged_write(..,%s,%u,%u,%u)\n",
-        m->desc, page_size, addr, n_bytes);
+  DEBUG("STK500V2: stk500v2_paged_write(..,%s,%d,%d)\n",m->desc,page_size,n_bytes);
 
   if (page_size == 0) page_size = 256;
   hiaddr = UINT_MAX;
@@ -1810,13 +1809,21 @@ static int stk500v2_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 
   last_addr=UINT_MAX;		/* impossible address */
 
-  for (; addr < maxaddr; addr += page_size) {
-    if ((maxaddr - addr) < page_size)
-      block_size = maxaddr - addr;
+  for (addr=0; addr < n_bytes; addr += page_size) {
+    report_progress(addr,n_bytes,NULL);
+
+    if ((n_bytes-addr) < page_size)
+      block_size = n_bytes - addr;
     else
       block_size = page_size;
 
     DEBUG("block_size at addr %d is %d\n",addr,block_size);
+
+    if(commandbuf[0] == CMD_PROGRAM_FLASH_ISP){
+      if (stk500v2_is_page_empty(addr, block_size, m->buf)) {
+          continue;
+      }
+    }
 
     memcpy(buf,commandbuf,sizeof(commandbuf));
 
@@ -1847,17 +1854,14 @@ static int stk500v2_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
  * Write pages of flash/EEPROM, generic HV mode
  */
 static int stk500hv_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                unsigned int page_size,
-                                unsigned int addr, unsigned int n_bytes,
-                                enum hvmode mode)
+				  int page_size, int n_bytes,
+				  enum hvmode mode)
 {
-  unsigned int block_size, last_addr, hiaddr, addrshift, use_ext_addr;
-  unsigned int maxaddr = addr + n_bytes;
+  unsigned int addr, block_size, last_addr, hiaddr, addrshift, use_ext_addr;
   unsigned char commandbuf[5], buf[266];
   int result;
 
-  DEBUG("STK500V2: stk500hv_paged_write(..,%s,%u,%u)\n",
-        m->desc, page_size, addr, n_bytes);
+  DEBUG("STK500V2: stk500hv_paged_write(..,%s,%d,%d)\n",m->desc,page_size,n_bytes);
 
   hiaddr = UINT_MAX;
   addrshift = 0;
@@ -1902,13 +1906,21 @@ static int stk500hv_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
 
   last_addr = UINT_MAX;		/* impossible address */
 
-  for (; addr < maxaddr; addr += page_size) {
-    if ((maxaddr - addr) < page_size)
-      block_size = maxaddr - addr;
+  for (addr = 0; addr < n_bytes; addr += page_size) {
+    report_progress(addr,n_bytes,NULL);
+
+    if ((n_bytes-addr) < page_size)
+      block_size = n_bytes - addr;
     else
       block_size = page_size;
 
     DEBUG("block_size at addr %d is %d\n",addr,block_size);
+
+    if (addrshift == 1) {
+      if (stk500v2_is_page_empty(addr, block_size, m->buf)) {
+          continue;
+      }
+    }
 
     memcpy(buf, commandbuf, sizeof(commandbuf));
 
@@ -1941,36 +1953,46 @@ static int stk500hv_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
  * Write pages of flash/EEPROM, PP mode
  */
 static int stk500pp_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                unsigned int page_size,
-                                unsigned int addr, unsigned int n_bytes)
+				int page_size, int n_bytes)
 {
-  return stk500hv_paged_write(pgm, p, m, page_size, addr, n_bytes, PPMODE);
+  return stk500hv_paged_write(pgm, p, m, page_size, n_bytes, PPMODE);
 }
 
 /*
  * Write pages of flash/EEPROM, HVSP mode
  */
 static int stk500hvsp_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                  unsigned int page_size,
-                                  unsigned int addr, unsigned int n_bytes)
+				  int page_size, int n_bytes)
 {
-  return stk500hv_paged_write(pgm, p, m, page_size, addr, n_bytes, HVSPMODE);
+  return stk500hv_paged_write(pgm, p, m, page_size, n_bytes, HVSPMODE);
+}
+
+static int stk500v2_is_page_empty(unsigned int address, int page_size,
+                                const unsigned char *buf)
+{
+    int i;
+    for(i = 0; i < page_size; i++) {
+        if(buf[address + i] != 0xFF) {
+            /* Page is not empty. */
+            return(0);
+        }
+    }
+
+    /* Page is empty. */
+    return(1);
 }
 
 static int stk500v2_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                               unsigned int page_size,
-                               unsigned int addr, unsigned int n_bytes)
+                             int page_size, int n_bytes)
 {
-  unsigned int block_size, hiaddr, addrshift, use_ext_addr;
-  unsigned int maxaddr = addr + n_bytes;
+  unsigned int addr, block_size, hiaddr, addrshift, use_ext_addr;
   unsigned char commandbuf[4];
   unsigned char buf[275];	// max buffer size for stk500v2 at this point
   unsigned char cmds[4];
   int result;
   OPCODE * rop;
 
-  DEBUG("STK500V2: stk500v2_paged_load(..,%s,%u,%u,%u)\n",
-        m->desc, page_size, addr, n_bytes);
+  DEBUG("STK500V2: stk500v2_paged_load(..,%s,%d,%d)\n",m->desc,page_size,n_bytes);
 
   page_size = m->readsize;
 
@@ -2008,9 +2030,11 @@ static int stk500v2_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
   avr_set_bits(rop, cmds);
   commandbuf[3] = cmds[0];
 
-  for (; addr < maxaddr; addr += page_size) {
-    if ((maxaddr - addr) < page_size)
-      block_size = maxaddr - addr;
+  for (addr=0; addr < n_bytes; addr += page_size) {
+    report_progress(addr, n_bytes,NULL);
+
+    if ((n_bytes-addr) < page_size)
+      block_size = n_bytes - addr;
     else
       block_size = page_size;
     DEBUG("block_size at addr %d is %d\n",addr,block_size);
@@ -2053,17 +2077,14 @@ static int stk500v2_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
  * Read pages of flash/EEPROM, generic HV mode
  */
 static int stk500hv_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                               unsigned int page_size,
-                               unsigned int addr, unsigned int n_bytes,
-                               enum hvmode mode)
+			       int page_size, int n_bytes,
+			       enum hvmode mode)
 {
-  unsigned int block_size, hiaddr, addrshift, use_ext_addr;
-  unsigned int maxaddr = addr + n_bytes;
+  unsigned int addr, block_size, hiaddr, addrshift, use_ext_addr;
   unsigned char commandbuf[3], buf[266];
   int result;
 
-  DEBUG("STK500V2: stk500hv_paged_load(..,%s,%u,%u,%u)\n",
-        m->desc, page_size, addr, n_bytes);
+  DEBUG("STK500V2: stk500hv_paged_load(..,%s,%d,%d)\n",m->desc,page_size,n_bytes);
 
   page_size = m->readsize;
 
@@ -2089,9 +2110,11 @@ static int stk500hv_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
     commandbuf[0] = mode == PPMODE? CMD_READ_EEPROM_PP: CMD_READ_EEPROM_HVSP;
   }
 
-  for (; addr < maxaddr; addr += page_size) {
-    if ((maxaddr - addr) < page_size)
-      block_size = maxaddr - addr;
+  for (addr = 0; addr < n_bytes; addr += page_size) {
+    report_progress(addr, n_bytes, NULL);
+
+    if ((n_bytes-addr) < page_size)
+      block_size = n_bytes - addr;
     else
       block_size = page_size;
     DEBUG("block_size at addr %d is %d\n",addr,block_size);
@@ -2133,20 +2156,18 @@ static int stk500hv_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
  * Read pages of flash/EEPROM, PP mode
  */
 static int stk500pp_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                               unsigned int page_size,
-                               unsigned int addr, unsigned int n_bytes)
+			       int page_size, int n_bytes)
 {
-  return stk500hv_paged_load(pgm, p, m, page_size, addr, n_bytes, PPMODE);
+  return stk500hv_paged_load(pgm, p, m, page_size, n_bytes, PPMODE);
 }
 
 /*
  * Read pages of flash/EEPROM, HVSP mode
  */
 static int stk500hvsp_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * m,
-                                 unsigned int page_size,
-                                 unsigned int addr, unsigned int n_bytes)
+				 int page_size, int n_bytes)
 {
-  return stk500hv_paged_load(pgm, p, m, page_size, addr, n_bytes, HVSPMODE);
+  return stk500hv_paged_load(pgm, p, m, page_size, n_bytes, HVSPMODE);
 }
 
 
@@ -3284,10 +3305,10 @@ static int stk600_xprog_read_byte(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
 
 
 static int stk600_xprog_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
-                                   unsigned int page_size,
-                                   unsigned int addr, unsigned int n_bytes)
+				   int page_size, int n_bytes)
 {
     unsigned char *b;
+    unsigned int addr;
     unsigned int offset;
     unsigned char memtype;
     int n_bytes_orig = n_bytes;
@@ -3333,8 +3354,7 @@ static int stk600_xprog_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
                 progname, mem->desc);
         return -1;
     }
-    offset = addr;
-    addr += mem->offset;
+    addr = mem->offset;
 
     if ((b = malloc(page_size + 2)) == NULL) {
 	fprintf(stderr,
@@ -3346,7 +3366,9 @@ static int stk600_xprog_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
     if (stk500v2_loadaddr(pgm, use_ext_addr) < 0)
         return -1;
 
+    offset = 0;
     while (n_bytes != 0) {
+	report_progress(offset, n_bytes_orig, NULL);
 	b[0] = XPRG_CMD_READ_MEM;
 	b[1] = memtype;
 	b[2] = addr >> 24;
@@ -3375,10 +3397,10 @@ static int stk600_xprog_paged_load(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
 }
 
 static int stk600_xprog_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
-                                    unsigned int page_size,
-                                    unsigned int addr, unsigned int n_bytes)
+				    int page_size, int n_bytes)
 {
     unsigned char *b;
+    unsigned int addr;
     unsigned int offset;
     unsigned char memtype;
     int n_bytes_orig = n_bytes;
@@ -3438,8 +3460,7 @@ static int stk600_xprog_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
                 progname, mem->desc);
         return -1;
     }
-    offset = addr;
-    addr += mem->offset;
+    addr = mem->offset;
 
     if ((b = malloc(page_size + 9)) == NULL) {
 	fprintf(stderr,
@@ -3451,7 +3472,10 @@ static int stk600_xprog_paged_write(PROGRAMMER * pgm, AVRPART * p, AVRMEM * mem,
     if (stk500v2_loadaddr(pgm, use_ext_addr) < 0)
         return -1;
 
+    offset = 0;
     while (n_bytes != 0) {
+	report_progress(offset, n_bytes_orig, NULL);
+
 	if (page_size > 256) {
 	    /*
 	     * AVR079 is not quite clear.  While it suggests that

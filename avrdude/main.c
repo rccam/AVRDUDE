@@ -250,6 +250,7 @@ int main(int argc, char * argv [])
   int              ch;          /* options flag */
   int              len;         /* length for various strings */
   struct avrpart * p;           /* which avr part we are programming */
+  struct avrpart * v;           /* used for verify */
   AVRMEM         * sig;         /* signature data */
   struct stat      sb;
   UPDATE         * upd;
@@ -738,13 +739,13 @@ int main(int argc, char * argv [])
     safemode = 0;
   }
 
-
-  if (avr_initmem(p) != 0)
-  {
-    fprintf(stderr, "\n%s: failed to initialize memories\n",
-            progname);
-    exit(1);
-  }
+  /*
+   * set up seperate instances of the avr part, one for use in
+   * programming, one for use in verifying.  These are separate
+   * because they need separate flash and eeprom buffer space
+   */
+  p = avr_dup_part(p);
+  v = avr_dup_part(p);
 
   /*
    * open the programmer
@@ -1005,7 +1006,8 @@ int main(int argc, char * argv [])
    *
    * The cycle count will be displayed anytime it will be changed later.
    */
-  if (init_ok && !(p->flags & AVRPART_AVR32) && do_cycles) {
+  if (init_ok && !(p->flags & AVRPART_AVR32) && 
+      (set_cycles == -1) && ((erase == 0) || (do_cycles == 0))) {
     /*
      * see if the cycle count in the last four bytes of eeprom seems
      * reasonable
@@ -1014,8 +1016,9 @@ int main(int argc, char * argv [])
     if (quell_progress < 2) {
       if ((rc >= 0) && (cycles != 0)) {
         fprintf(stderr,
-              "%s: current erase-rewrite cycle count is %d\n",
-              progname, cycles);
+              "%s: current erase-rewrite cycle count is %d%s\n",
+              progname, cycles,
+              do_cycles ? "" : " (if being tracked)");
       }
     }
   }
@@ -1078,7 +1081,7 @@ int main(int argc, char * argv [])
 
   for (ln=lfirst(updates); ln; ln=lnext(ln)) {
     upd = ldata(ln);
-    rc = do_op(pgm, p, upd, nowrite);
+    rc = do_op(pgm, p, upd, nowrite, verify);
     if (rc) {
       exitrc = 1;
       break;
